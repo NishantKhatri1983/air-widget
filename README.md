@@ -18,6 +18,10 @@ Built and tested with a Mi Air Purifier 2 (`zhimi.airpurifier.m1`) on Android 17
 - **Control sheet** – tap the widget. Old models such as the m1 only understand the classic miIO calls
   (`set_power`, `set_mode`, `set_level_favorite`); newer MIoT models are handled through `set_properties`.
 
+## Download
+
+Prebuilt APK (debug-signed): [apk/air-widget-v1.0.apk](apk/air-widget-v1.0.apk), also attached to the [v1.0 release](https://github.com/NishantKhatri1983/air-widget/releases/tag/v1.0).
+
 ## Build
 
 JDK 17+, Android SDK (platform 36), Gradle 9.1 and Android Gradle Plugin 9.0.1:
