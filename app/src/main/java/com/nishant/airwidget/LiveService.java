@@ -93,6 +93,8 @@ public class LiveService extends Service {
         long delay = LOCAL_EVERY_MS;
         while (running) {
             if (paused) {
+                // Screen is off: a poll request made now must not turn the wait below into a busy loop.
+                pollRequested = false;
                 waitFor(60000);
                 continue;
             }
@@ -115,7 +117,7 @@ public class LiveService extends Service {
 
     private void waitFor(long ms) {
         synchronized (wake) {
-            if (pollRequested) return;
+            if (pollRequested && !paused) return;   // while paused, only the screen-on handler may end the wait
             try {
                 wake.wait(ms);
             } catch (InterruptedException e) {
