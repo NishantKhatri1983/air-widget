@@ -15,12 +15,15 @@ Built and tested with a Mi Air Purifier 2 (`zhimi.airpurifier.m1`) on Android 17
   (e.g. on mobile data) it falls back to the Mi cloud (`/miotspec/prop/get|set`, RC4-signed requests).
 - **AQI** – this purifier reports PM2.5; Mi Home's "AQI" is that same number, so the default scale is "Same as Mi Home".
   India (CPCB) and US EPA conversions are selectable in the app.
+- **Pastel colours** – the widget card and the control sheet tint with the air quality (mint, lime, yellow-peach,
+  orange, rose, lavender for PM2.5 0-30 / 31-60 / 61-90 / 91-120 / 121-250 / 251+), blending smoothly between bands;
+  neutral white-grey when the purifier is off.
 - **Control sheet** – tap the widget. Old models such as the m1 only understand the classic miIO calls
   (`set_power`, `set_mode`, `set_level_favorite`); newer MIoT models are handled through `set_properties`.
 
 ## Download
 
-Latest prebuilt APK (debug-signed): [apk/air-widget-v1.1.apk](apk/air-widget-v1.1.apk), also attached to the [v1.1 release](https://github.com/NishantKhatri1983/air-widget/releases/tag/v1.1). Older: [v1.0](apk/air-widget-v1.0.apk). Don't install an older APK over a newer one.
+Latest prebuilt APK (debug-signed): [apk/air-widget-v1.2.apk](apk/air-widget-v1.2.apk), also attached to the [v1.2 release](https://github.com/NishantKhatri1983/air-widget/releases/tag/v1.2). Older: [v1.1](apk/air-widget-v1.1.apk), [v1.0](apk/air-widget-v1.0.apk). Don't install an older APK over a newer one.
 
 ## Build
 

@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
 import android.widget.RemoteViews;
 
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.util.Locale;
 
 /**
  * 2x2 light home-screen widget: temperature, humidity, AQI, state and a power button.
+ * The card turns pastel green / lime / yellow / orange / rose / lavender with the air quality.
  * Tap the card = control sheet; tap the blue power circle = toggle the purifier.
  */
 public class AirWidget extends AppWidgetProvider {
@@ -28,6 +30,11 @@ public class AirWidget extends AppWidgetProvider {
             LiveService.start(ctx);
             LiveService.pollNow();
         }
+    }
+
+    @Override
+    public void onAppWidgetOptionsChanged(Context ctx, AppWidgetManager mgr, int id, Bundle opts) {
+        render(ctx);    // resized: redraw the background at the new size
     }
 
     @Override
@@ -76,12 +83,32 @@ public class AirWidget extends AppWidgetProvider {
         AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
         int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, AirWidget.class));
         if (ids == null || ids.length == 0) return;
-
         Prefs p = new Prefs(ctx);
+        for (int id : ids) {
+            mgr.updateAppWidget(id, build(ctx, p, mgr.getAppWidgetOptions(id)));
+        }
+    }
+
+    private static RemoteViews build(Context ctx, Prefs p, Bundle opts) {
         RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget);
         int flags = PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT;
+        float d = ctx.getResources().getDisplayMetrics().density;
 
-        if (!p.configured()) {
+        boolean configured = p.configured();
+        boolean known = !p.get("lastOn").isEmpty();
+        boolean on = p.get("lastOn").equals("1");
+        Double t = num(p.lastTemp()), h = num(p.lastHum()), pm = num(p.lastPm());
+
+        // pastel card background sized to this widget instance
+        int wDp = opts == null ? 0 : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+        int hDp = opts == null ? 0 : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        if (wDp <= 0) wDp = 128;
+        if (hDp <= 0) hDp = 128;
+        int[] g = Pastel.gradient(configured ? pm : null, on);
+        v.setImageViewBitmap(R.id.bg, Pastel.card(Math.min(1000, Math.round(wDp * d)),
+                Math.min(1000, Math.round(hDp * d)), g[0], g[1], 28 * d, Math.max(1f, d)));
+
+        if (!configured) {
             v.setTextViewText(R.id.name, "Air Widget");
             v.setTextViewText(R.id.state, "not set up");
             v.setTextViewText(R.id.temp, "--°");
@@ -90,47 +117,46 @@ public class AirWidget extends AppWidgetProvider {
             v.setTextViewText(R.id.updated, "tap to set up");
             v.setOnClickPendingIntent(R.id.root,
                     PendingIntent.getActivity(ctx, 1, new Intent(ctx, SetupActivity.class), flags));
-        } else {
-            Double t = num(p.lastTemp()), h = num(p.lastHum()), pm = num(p.lastPm());
-            boolean known = !p.get("lastOn").isEmpty();
-            boolean on = p.get("lastOn").equals("1");
-            String mode = p.get("lastMode");
-            String modeName = mode.equals("0") ? "Auto" : mode.equals("1") ? "Sleep" : mode.equals("2") ? "Favorite" : "";
-
-            v.setTextViewText(R.id.name, p.devName().isEmpty() ? "Air purifier" : p.devName());
-            v.setTextViewText(R.id.state, !known ? "—" : on ? "On" + (modeName.isEmpty() ? "" : " · " + modeName) : "Off");
-            v.setTextColor(R.id.dot, !known ? 0xFF9AA5B4 : on ? 0xFF2E9E4F : 0xFF9AA5B4);
-            v.setInt(R.id.power, "setBackgroundResource", on ? R.drawable.bg_power_on : R.drawable.bg_power_off);
-            v.setInt(R.id.power, "setColorFilter", on ? 0xFFFFFFFF : 0xFF6B7785);
-
-            v.setTextViewText(R.id.temp, t == null ? "--°" : fmt(t) + "°");
-            v.setTextViewText(R.id.hum, h == null ? "--%" : "💧 " + Math.round(h) + "%");
-            if (pm == null) {
-                v.setTextViewText(R.id.aqi, "AQI --");
-            } else {
-                v.setTextViewText(R.id.aqi, "AQI " + Aqi.fromPm25(pm, p.aqiStd()));
-                v.setTextColor(R.id.aqi, darken(Aqi.colorFor(pm, p.aqiStd())));
-            }
-            long age = System.currentTimeMillis() - p.lastTime();
-            String when = p.lastTime() == 0 ? "waiting…"
-                    : age < 15000 ? "Updated just now"
-                    : "Updated " + new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date(p.lastTime()));
-            v.setTextViewText(R.id.updated, when + (p.lastSrc().isEmpty() ? "" : " · " + p.lastSrc())
-                    + (age > 120000 ? " (old)" : ""));
-
-            v.setOnClickPendingIntent(R.id.root,
-                    PendingIntent.getActivity(ctx, 3, new Intent(ctx, ControlActivity.class), flags));
-            v.setOnClickPendingIntent(R.id.power, PendingIntent.getBroadcast(ctx, 4,
-                    new Intent(ctx, AirWidget.class).setAction(ACTION_POWER), flags));
+            return v;
         }
-        mgr.updateAppWidget(ids, v);
+
+        String mode = p.get("lastMode");
+        String modeName = mode.equals("0") ? "Auto" : mode.equals("1") ? "Sleep" : mode.equals("2") ? "Favorite" : "";
+        v.setTextViewText(R.id.name, p.devName().isEmpty() ? "Air purifier" : p.devName());
+        v.setTextViewText(R.id.state, !known ? "—" : on ? "On" + (modeName.isEmpty() ? "" : " · " + modeName) : "Off");
+        v.setTextColor(R.id.dot, !known ? 0xFF9AA5B4 : on ? 0xFF2E9E4F : 0xFF9AA5B4);
+        v.setInt(R.id.power, "setBackgroundResource", on ? R.drawable.bg_power_on : R.drawable.bg_power_off);
+        v.setInt(R.id.power, "setColorFilter", on ? 0xFFFFFFFF : 0xFF6B7785);
+
+        v.setTextViewText(R.id.temp, t == null ? "--°" : fmt(t) + "°");
+        v.setTextViewText(R.id.hum, h == null ? "--%" : Math.round(h) + "%");
+        if (pm == null) {
+            v.setTextViewText(R.id.aqi, "AQI --");
+            v.setTextColor(R.id.aqi, 0xFF9AA5B4);
+        } else {
+            v.setTextViewText(R.id.aqi, "AQI " + Aqi.fromPm25(pm, p.aqiStd()));
+            v.setTextColor(R.id.aqi, on ? darken(Aqi.colorFor(pm, p.aqiStd())) : 0xFF9AA5B4);
+        }
+
+        long age = System.currentTimeMillis() - p.lastTime();
+        String when = p.lastTime() == 0 ? "waiting…" : age < 15000 ? "now"
+                : new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(p.lastTime()));
+        String cat = pm != null && on ? Aqi.category(pm) + " · " : "";
+        v.setTextViewText(R.id.updated, cat + when + (age > 120000 ? " (old)" : ""));
+
+        v.setOnClickPendingIntent(R.id.root,
+                PendingIntent.getActivity(ctx, 3, new Intent(ctx, ControlActivity.class), flags));
+        v.setOnClickPendingIntent(R.id.power, PendingIntent.getBroadcast(ctx, 4,
+                new Intent(ctx, AirWidget.class).setAction(ACTION_POWER), flags));
+        return v;
     }
 
-    /** The bright AQI colours need darkening to be readable on the light card. */
+    /** The bright AQI colours need darkening to be readable on the pastel card. */
     private static int darken(int c) {
         float[] hsv = new float[3];
         android.graphics.Color.colorToHSV(c, hsv);
-        hsv[2] = Math.min(hsv[2], 0.7f);
+        hsv[1] = Math.min(1f, hsv[1] * 1.1f);
+        hsv[2] = Math.min(hsv[2], 0.62f);
         return android.graphics.Color.HSVToColor(hsv);
     }
 

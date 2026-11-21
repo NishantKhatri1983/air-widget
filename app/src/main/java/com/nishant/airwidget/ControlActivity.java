@@ -191,6 +191,8 @@ public class ControlActivity extends Activity {
         aqiVal.setText(aqiText);
         aqiVal.setTextColor(darken(color));
 
+        tintSheet(on ? pm : null, on);
+
         // How fast the animated air moves.
         float sp;
         if (!on) sp = 0f;
@@ -208,6 +210,20 @@ public class ControlActivity extends Activity {
                     + (fav ? "fan " + lvl + "/" + max : auto ? "auto fan" : "quiet fan"));
         }
         if (st.source != null) status.setText("live · " + st.source);
+    }
+
+    private int tint0, tint1;
+
+    /** Pastel sheet background that follows the air quality, like the widget card. */
+    private void tintSheet(Double pm, boolean on) {
+        int[] g = pm == null ? new int[]{0xFFF0F3FA, 0xFFF0F3FA} : Pastel.gradient(pm, on);
+        if (g[0] == tint0 && g[1] == tint1) return;
+        tint0 = g[0]; tint1 = g[1];
+        float r = 32 * getResources().getDisplayMetrics().density;
+        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, g);
+        gd.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        sheet.setBackground(gd);
     }
 
     private static void opt(ImageView ic, TextView lb, boolean selected) {
