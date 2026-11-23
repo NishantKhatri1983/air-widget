@@ -80,7 +80,8 @@ public class AirView extends View {
     }
 
     private void layoutPhoto() {
-        ph = 182 * u;
+        // keep ~78 dp above the grille for the blue airflow streaks; the purifier takes whatever height is left
+        ph = Math.max(70 * u, Math.min(182 * u, getHeight() - 102 * u));
         pw = ph * (photo == null ? 0.62f : photo.getWidth() / (float) photo.getHeight());
         pl = getWidth() / 2f - pw / 2f;
         pt = getHeight() - 24 * u - ph;

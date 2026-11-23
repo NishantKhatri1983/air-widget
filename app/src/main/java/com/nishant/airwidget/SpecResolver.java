@@ -29,12 +29,12 @@ final class SpecResolver {
             }
             if (type == null) {
                 Log.i(TAG, "no MIoT spec for " + model);
-                p.remove("tS", "tP", "hS", "hP", "pS", "pP", "oS", "oP", "mS", "mP", "fS", "fP");
+                p.remove("tS", "tP", "hS", "hP", "pS", "pP", "oS", "oP", "mS", "mP", "fS", "fP", "rS", "rP", "bS", "bP");
                 return false;
             }
             JSONObject spec = new JSONObject(Http.get(
                     "https://miot-spec.org/miot-spec-v2/instance?type=" + URLEncoder.encode(type, "UTF-8"), 30000));
-            int[] t = null, h = null, pm = null, on = null, mode = null, fan = null;
+            int[] t = null, h = null, pm = null, on = null, mode = null, fan = null, rpm = null, buzz = null;
             JSONArray services = spec.getJSONArray("services");
             for (int i = 0; i < services.length(); i++) {
                 JSONObject sv = services.getJSONObject(i);
@@ -52,6 +52,8 @@ final class SpecResolver {
                     if (n.equals("pm2.5-density") && (pm == null || env)) pm = ids;
                     if (purifier && n.equals("on") && on == null) on = ids;
                     if (purifier && n.equals("mode") && mode == null) mode = ids;
+                    if (n.equals("motor-speed") && rpm == null) rpm = ids;     // measured fan speed, if the model exposes it
+                    if (svName.equals("alarm") && n.equals("alarm") && buzz == null) buzz = ids;     // the beep
                     if (n.equals("favorite-fan-level") && fan == null) {
                         fan = ids;
                         JSONArray range = pr.optJSONArray("value-range");
@@ -65,6 +67,9 @@ final class SpecResolver {
             put(p, "o", on);
             put(p, "m", mode);
             put(p, "f", fan);
+            put(p, "r", rpm);
+            put(p, "b", buzz);
+            p.putInt("specRpm", 1);
             Log.i(TAG, "spec " + model + ": temp=" + str(t) + " hum=" + str(h) + " pm2.5=" + str(pm)
                     + " on=" + str(on) + " mode=" + str(mode) + " fan=" + str(fan));
             return true;

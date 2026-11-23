@@ -11,6 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,11 +25,21 @@ public class ControlActivity extends Activity {
     private final PurifierControl.State st = new PurifierControl.State();
 
     private View sheet;
-    private TextView title, subtitle, speedLabel, status, statusTitle, statusSub, tempVal, humVal, aqiVal;
+    private TextView title, subtitle, speedLabel, status, tempVal, humVal, aqiVal;
     private TextView lbAuto, lbSleep, lbFav;
     private ImageView power, icAuto, icSleep, icFav;
     private SeekBar speed;
     private AirView air;
+    private HistoryView hist;
+    private int topInset;
+    private android.widget.Switch smartSwitch;
+    private TextView smartRule, smartStatus;
+    private TextView histSummary;
+    private final TextView[] chips = new TextView[4];
+    private static final long[] RANGE_MS = {3600_000L, 6 * 3600_000L, 24 * 3600_000L, 7 * 24 * 3600_000L};
+    private final ExecutorService hio = Executors.newSingleThreadExecutor();
+    private int histRange = 1, histVer = -1;
+    private long histLoadedAt;
 
     private volatile boolean resumed;
     private volatile long holdUntil;
@@ -53,20 +64,45 @@ public class ControlActivity extends Activity {
         lbFav = findViewById(R.id.lbFav);
         speedLabel = findViewById(R.id.speedLabel);
         speed = findViewById(R.id.speed);
-        statusTitle = findViewById(R.id.statusTitle);
-        statusSub = findViewById(R.id.statusSub);
         status = findViewById(R.id.status);
+        hist = findViewById(R.id.hist);
+        smartSwitch = findViewById(R.id.smartSwitch);
+        smartRule = findViewById(R.id.smartRule);
+        smartStatus = findViewById(R.id.smartStatus);
+        smartSwitch.setOnCheckedChangeListener((btn, on) -> {
+            if (on == SmartFan.enabled(new Prefs(this))) return;      // programmatic refresh
+            if (on && !Boolean.TRUE.equals(st.on)) {
+                Toast.makeText(this, "Turn the purifier on first", Toast.LENGTH_SHORT).show();
+                btn.setChecked(false);
+                return;
+            }
+            SmartFan.setEnabled(this, on);
+            renderSmart();
+        });
+        findViewById(R.id.smartEdit).setOnClickListener(v -> editSmartRule());
+        histSummary = findViewById(R.id.histSummary);
+        int[] chipIds = {R.id.rng0, R.id.rng1, R.id.rng2, R.id.rng3};
+        for (int i = 0; i < chips.length; i++) {
+            final int ri = i;
+            chips[i] = findViewById(chipIds[i]);
+            chips[i].setOnClickListener(v -> pickRange(ri));
+        }
 
         findViewById(R.id.root).setOnClickListener(v -> finish());   // tap outside = close
         sheet.setOnApplyWindowInsetsListener((v, insets) -> {
-            int extra = (int) (16 * getResources().getDisplayMetrics().density);
+            int extra = (int) (8 * getResources().getDisplayMetrics().density);
+            topInset = insets.getSystemWindowInsetTop();
             v.setPadding(v.getPaddingLeft(), v.getPaddingTop(), v.getPaddingRight(),
                     extra + insets.getSystemWindowInsetBottom());
             return insets;
         });
         sheet.requestApplyInsets();
+        findViewById(R.id.root).getViewTreeObserver().addOnGlobalLayoutListener(this::fitAir);
 
         Prefs p = new Prefs(this);
+        histRange = Math.max(0, Math.min(RANGE_MS.length - 1, p.getInt("histRange", 1)));
+        paintChips();
+        loadHistory(true);
         title.setText(p.devName().isEmpty() ? "Air purifier" : p.devName());
         speed.setMax(PurifierControl.maxLevel(p));
 
@@ -92,6 +128,7 @@ public class ControlActivity extends Activity {
             @Override public void onStartTrackingTouch(SeekBar s) { holdUntil = Long.MAX_VALUE; }
             @Override public void onStopTrackingTouch(SeekBar s) {
                 final int level = s.getProgress();
+                yieldFan();
                 final boolean needFav = !Integer.valueOf(PurifierControl.FAVORITE).equals(st.mode);
                 final boolean wasOn = Boolean.TRUE.equals(st.on);
                 st.level = level;
@@ -108,6 +145,7 @@ public class ControlActivity extends Activity {
     }
 
     private void pickMode(int mode) {
+        if (mode != PurifierControl.FAVORITE) yieldFan();
         final boolean wasOn = Boolean.TRUE.equals(st.on);
         st.mode = mode;
         st.on = true;
@@ -144,11 +182,12 @@ public class ControlActivity extends Activity {
             PurifierControl.State s = PurifierControl.read(this);
             ui.post(() -> apply(s));
         } catch (IOException | RuntimeException e) {
-            ui.post(() -> status.setText("Can't reach the purifier: " + e.getMessage()));
+            ui.post(() -> showStatus("Can't reach the purifier: " + e.getMessage()));
         }
     }
 
     private void apply(PurifierControl.State s) {
+        showStatus(null);
         if (s.on != null) st.on = s.on;
         if (s.mode != null) st.mode = s.mode;
         if (s.level != null) st.level = s.level;
@@ -201,15 +240,57 @@ public class ControlActivity extends Activity {
         else sp = pm == null ? 0.4f : (float) Math.max(0.25, Math.min(1.0, 0.25 + pm / 150.0 * 0.75));
         air.setState(on, sp, aqiText, color);
 
-        if (!on) {
-            statusTitle.setText(st.on == null ? "Connecting…" : "Purifier is off");
-            statusSub.setText(st.on == null ? "" : "Tap the power button to start");
+        // one status line replaces the old "Filtering air" card (saves a screen's worth of height)
+        if (st.on == null) subtitle.setText("Connecting…");
+        else if (!on) subtitle.setText("Off");
+        else subtitle.setText("On" + (modeName.isEmpty() ? "" : " · " + modeName)
+                + (pm == null ? "" : " · " + Aqi.category(pm) + " · PM2.5 " + Math.round(pm)));
+        renderSmart();
+    }
+
+    /** Errors only: the sheet stays quiet while everything works. */
+    private void showStatus(String msg) {
+        if (msg == null || msg.isEmpty()) {
+            status.setVisibility(View.GONE);
         } else {
-            statusTitle.setText("Filtering air");
-            statusSub.setText((pm == null ? "" : Aqi.category(pm) + " · PM2.5 " + Math.round(pm) + " µg/m³ · ")
-                    + (fav ? "fan " + lvl + "/" + max : auto ? "auto fan" : "quiet fan"));
+            status.setText(msg);
+            status.setVisibility(View.VISIBLE);
         }
-        if (st.source != null) status.setText("live · " + st.source);
+    }
+
+    /**
+     * Makes the whole sheet fit on one screen. If it is too tall the animated purifier gives up height first (down to
+     * a minimum), then the graph; if there is room to spare the graph grows first, then the purifier. On a very short
+     * screen both stop at their minimum and the sheet scrolls instead.
+     */
+    private void fitAir() {
+        float d = getResources().getDisplayMetrics().density;
+        int rootH = findViewById(R.id.root).getHeight();
+        if (rootH == 0 || sheet == null) return;
+        android.view.ViewGroup.LayoutParams la = air.getLayoutParams(), lg = hist.getLayoutParams();
+        int aH = la.height, gH = lg.height;
+        int minA = (int) (130 * d), maxA = (int) (300 * d), minG = (int) (110 * d), maxG = (int) (172 * d);
+        int avail = rootH - topInset - (int) (6 * d);
+        int need = ((android.view.ViewGroup) sheet).getChildAt(0).getHeight() + sheet.getPaddingTop() + sheet.getPaddingBottom();
+        int diff = need - avail;
+        if (diff > 0) {
+            int cutA = Math.min(diff, Math.max(0, aH - minA));
+            aH -= cutA;
+            diff -= cutA;
+            gH -= Math.min(diff, Math.max(0, gH - minG));
+        } else if (-diff > 10 * d) {
+            int spare = -diff - (int) (4 * d);
+            int addG = Math.min(spare, Math.max(0, maxG - gH));
+            gH += addG;
+            spare -= addG;
+            aH += Math.min(spare, Math.max(0, maxA - aH));
+        }
+        if (Math.abs(aH - la.height) > 1 || Math.abs(gH - lg.height) > 1) {
+            la.height = aH;
+            lg.height = gH;
+            air.setLayoutParams(la);
+            hist.setLayoutParams(lg);
+        }
     }
 
     private int tint0, tint1;
@@ -224,6 +305,125 @@ public class ControlActivity extends Activity {
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR, g);
         gd.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
         sheet.setBackground(gd);
+    }
+
+    // ------------------------------------------------------------------ smart fan
+
+    /** The user took the controls (mode button, slider): the smart fan steps aside. */
+    private void yieldFan() {
+        if (SmartFan.enabled(new Prefs(this))) {
+            SmartFan.yieldToUser(this);
+            Toast.makeText(this, "Smart fan off", Toast.LENGTH_SHORT).show();
+            renderSmart();
+        }
+    }
+
+    private void renderSmart() {
+        Prefs p = new Prefs(this);
+        boolean on = SmartFan.enabled(p);
+        if (smartSwitch.isChecked() != on) smartSwitch.setChecked(on);
+        smartRule.setText(SmartFan.rule(p).describe());
+        String s = SmartFan.status(p);
+        smartStatus.setText(s.isEmpty() ? "Off" : s);
+    }
+
+    private void editSmartRule() {
+        final Prefs p = new Prefs(this);
+        final SmartFan.Rule r = SmartFan.rule(p);
+        android.widget.LinearLayout col = new android.widget.LinearLayout(this);
+        col.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        col.setPadding(pad, pad / 2, pad, 0);
+        final android.widget.EditText start = field(col, "First step starts at AQI", r.start);
+        final android.widget.EditText first = field(col, "Fan level at that AQI", r.startLevel);
+        final android.widget.EditText step = field(col, "Add one level for every … AQI", r.step);
+        final android.widget.EditText low = field(col, "Fan level below the start AQI", r.low);
+        final android.widget.EditText hold = field(col, "Wait before lowering the fan (seconds)", r.holdSec);
+        final android.widget.EditText margin = field(col, "Extra AQI under the step before lowering", r.margin);
+        final android.widget.CheckBox mute = new android.widget.CheckBox(this);
+        mute.setText("Mute the purifier's beep when settings change");
+        mute.setChecked(p.getInt("mute", 1) == 1);
+        col.addView(mute);
+        final android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(col);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Smart fan rule")
+                .setMessage("Top level on this purifier is " + r.max + ".")
+                .setView(scroll)
+                .setPositiveButton("Save", (d, w) -> {
+                    int a = num(start, r.start), b = num(first, r.startLevel), c = num(step, r.step), l = num(low, r.low);
+                    SmartFan.saveRule(p, Math.max(0, Math.min(500, a)), Math.max(1, Math.min(200, c)),
+                            Math.max(0, Math.min(r.max, b)), Math.max(0, Math.min(r.max, l)),
+                            Math.max(0, Math.min(600, num(hold, r.holdSec))), Math.max(0, Math.min(25, num(margin, r.margin))));
+                    if (mute.isChecked() != (p.getInt("mute", 1) == 1)) PurifierControl.setMute(this, mute.isChecked());
+                    renderSmart();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private android.widget.EditText field(android.widget.LinearLayout col, String label, int value) {
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(13);
+        col.addView(t);
+        android.widget.EditText e = new android.widget.EditText(this);
+        e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        e.setText(String.valueOf(value));
+        e.setSelectAllOnFocus(true);
+        col.addView(e);
+        return e;
+    }
+
+    private static int num(android.widget.EditText e, int fallback) {
+        try { return Integer.parseInt(e.getText().toString().trim()); } catch (NumberFormatException x) { return fallback; }
+    }
+
+    // ------------------------------------------------------------------ air-quality history
+
+    private void pickRange(int i) {
+        histRange = i;
+        new Prefs(this).putInt("histRange", i);
+        paintChips();
+        loadHistory(true);
+    }
+
+    private void paintChips() {
+        for (int i = 0; i < chips.length; i++) {
+            boolean sel = i == histRange;
+            chips[i].setBackgroundResource(sel ? R.drawable.bg_chip_on : R.drawable.bg_chip_off);
+            chips[i].setTextColor(sel ? 0xFFFFFFFF : 0xFF5B6676);
+        }
+    }
+
+    /** Reloads the graph when new readings were logged (or after 30 s so the "now" edge keeps moving). */
+    private void loadHistory(boolean force) {
+        long nowMs = System.currentTimeMillis();
+        int ver = History.version();
+        if (!force && ver == histVer && nowMs - histLoadedAt < 30000) return;
+        histVer = ver;
+        histLoadedAt = nowMs;
+        final int ri = histRange;
+        final String std = new Prefs(this).aqiStd();
+        final int maxLv = PurifierControl.maxLevel(new Prefs(this));
+        try {
+            hio.submit(() -> {
+                long now = System.currentTimeMillis();
+                long from = now - RANGE_MS[ri];
+                List<History.Sample> all = History.load(this, now - History.KEEP_MS);
+                List<History.Sample> s = new java.util.ArrayList<>();
+                for (History.Sample x : all) if (x.t >= from) s.add(x);
+                FanScale scale = FanScale.learn(all, maxLv);
+                String text = HistoryStats.describe(s, std, now, from, scale);
+                ui.post(() -> {
+                    if (ri != histRange || isDestroyed()) return;
+                    // A young log: zoom to what exists instead of drawing a sliver at the right edge.
+                    long shown = s.isEmpty() ? from : Math.max(from, Math.min(s.get(0).t - 60_000L, now - 10 * 60_000L));
+                    hist.setData(s, shown, now, std, scale);
+                    histSummary.setText(text);
+                });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) { }
     }
 
     private static void opt(ImageView ic, TextView lb, boolean selected) {
@@ -260,12 +460,13 @@ public class ControlActivity extends Activity {
         resumed = true;
         new Thread(() -> {
             while (resumed) {
+                ui.post(() -> loadHistory(false));
                 if (System.currentTimeMillis() > holdUntil) {
                     try {
                         PurifierControl.State s = PurifierControl.read(this);
                         if (System.currentTimeMillis() > holdUntil) ui.post(() -> apply(s));
                     } catch (IOException | RuntimeException e) {
-                        ui.post(() -> status.setText("Can't reach the purifier: " + e.getMessage()));
+                        ui.post(() -> showStatus("Can't reach the purifier: " + e.getMessage()));
                     }
                 }
                 sleep(2000);
@@ -283,6 +484,7 @@ public class ControlActivity extends Activity {
     protected void onDestroy() {
         resumed = false;
         io.shutdown();
+        hio.shutdown();
         super.onDestroy();
     }
 }

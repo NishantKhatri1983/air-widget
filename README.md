@@ -18,7 +18,22 @@ Built and tested with a Mi Air Purifier 2 (`zhimi.airpurifier.m1`) on Android 17
 - **Pastel colours** – the widget card and the control sheet tint with the air quality (mint, lime, yellow-peach,
   orange, rose, lavender for PM2.5 0-30 / 31-60 / 61-90 / 91-120 / 121-250 / 251+), blending smoothly between bands;
   neutral white-grey when the purifier is off.
-- **Control sheet** – tap the widget. Old models such as the m1 only understand the classic miIO calls
+- **Air-quality history** – the control sheet has an *Air quality history* graph (1 h / 6 h / 24 h / 7 d). The AQI line is
+  coloured by band; underneath, a "fan" lane shows what the purifier was doing (Auto / Sleep / Favorite colour, height =
+  fan speed in rpm, grey = off). Touch or drag on the graph to read the time, AQI, mode and rpm at that moment. A short
+  summary says when the air rose above "Good", where it peaked, when the purifier switched on and how fast the fan ran,
+  and when it got back under "Good". Readings are logged to a private CSV (`history.csv`, 7 days, about one line a minute,
+  sooner when something changes). While the screen is off the widget still takes one reading every 2 minutes so the log
+  has no holes.
+- **Smart fan** – optional (off by default, switch in the control sheet). The app sets the Favorite-mode fan level from the
+  AQI shown in the widget: by default level 2 from AQI 50, one level more for every 25 AQI (3 at 75, 4 at 100, 5 at 125 ...
+  up to the purifier's top level), and level 1 below 50. All four numbers are editable (*Edit rule*). It averages the last
+  readings, needs two in a row to go up, waits 90 s with the air clearly (5 AQI) under a step before going down (wait and extra margin are editable) and changes the fan at most
+  every 45 s. If you change the mode or fan level yourself (the sheet, Mi Home, the purifier) it switches itself off
+  instead of fighting you. It never turns the purifier on. The history graph and summary mark the periods the Smart fan
+  was steering the fan (green) separately from Auto, Sleep and manual Favorite. The purifier's beep on every change is
+  switched off by default (a checkbox in *Edit rule* turns it back on).
+- **Control sheet** – tap the widget (everything fits on one screen; the animated purifier shrinks to make room). Fan speed is shown on the same 1-10 scale as the slider, including Auto, where the speed is derived from the measured rpm using what each level produced in Favorite mode. Old models such as the m1 only understand the classic miIO calls
   (`set_power`, `set_mode`, `set_level_favorite`); newer MIoT models are handled through `set_properties`.
 
 ## Download

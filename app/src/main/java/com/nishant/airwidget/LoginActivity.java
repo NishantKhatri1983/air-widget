@@ -34,8 +34,12 @@ public class LoginActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override public void onPageFinished(WebView v, String url) { check(); }
         });
-        setContentView(web);
-        Ui.applyInsets(this, web);
+        // Pad a wrapper, not the WebView: a WebView draws its page under its own padding, which hid the top of
+        // the page (the CAPTCHA instruction line) behind the title bar.
+        android.widget.FrameLayout box = new android.widget.FrameLayout(this);
+        box.addView(web, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        setContentView(box);
+        Ui.applyInsets(this, box);
         web.loadUrl(ACCOUNT + "/pass/serviceLogin?sid=xiaomiio&_locale=en_US");
         h.postDelayed(poll, 1000);
     }

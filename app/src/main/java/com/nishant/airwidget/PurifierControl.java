@@ -21,7 +21,7 @@ final class PurifierControl {
     static final class State {
         Boolean on;
         Integer mode;
-        Integer level;
+        Integer level, rpm;
         Double temp, hum, pm25;
         String source;
     }
@@ -42,7 +42,7 @@ final class PurifierControl {
             try {
                 State s = readLocal(p);
                 s.source = "local";
-                cache(p, s);
+                cache(ctx, p, s);
                 return s;
             } catch (IOException e) {
                 localErr = e;
@@ -51,7 +51,7 @@ final class PurifierControl {
         try {
             State s = readCloud(ctx, p);
             s.source = "cloud";
-            cache(p, s);
+            cache(ctx, p, s);
             return s;
         } catch (IOException e) {
             throw localErr != null ? localErr : e;
@@ -77,7 +77,7 @@ final class PurifierControl {
 
     private static void fillLegacy(State s, Prefs p) throws IOException {
         JSONArray names = new JSONArray().put("power").put("mode").put("favorite_level")
-                .put("aqi").put("humidity").put("temp_dec");
+                .put("aqi").put("humidity").put("temp_dec").put("motor1_speed");
         JSONArray r = MiioLocal.call(p.ip(), p.token(), "get_prop", names, 1500);
         if (r.length() < 6) throw new IOException("short get_prop reply " + r);
         s.on = "on".equals(r.optString(0));
@@ -86,6 +86,7 @@ final class PurifierControl {
         s.pm25 = r.optDouble(3);
         s.hum = r.optDouble(4);
         s.temp = r.optDouble(5) / 10.0;
+        if (r.length() >= 7 && !r.isNull(6) && r.optInt(6, -1) >= 0) s.rpm = r.optInt(6);
     }
 
     /** Legacy mode string -> 0/1/2, or null for anything else (e.g. what the device reports while off). */
@@ -102,7 +103,7 @@ final class PurifierControl {
 
     private static JSONArray allParams(Prefs p) throws IOException {
         JSONArray a = new JSONArray();
-        String[] keys = {"o", "m", "f", "t", "h", "p"};
+        String[] keys = {"o", "m", "f", "t", "h", "p", "r"};
         try {
             for (String k : keys) {
                 int siid = p.getInt(k + "S", 0);
@@ -125,6 +126,7 @@ final class PurifierControl {
             else if (is(p, "t", siid, piid)) s.temp = o.optDouble("value");
             else if (is(p, "h", siid, piid)) s.hum = o.optDouble("value");
             else if (is(p, "p", siid, piid)) s.pm25 = o.optDouble("value");
+            else if (is(p, "r", siid, piid)) s.rpm = o.optInt("value");
         }
     }
 
@@ -146,7 +148,7 @@ final class PurifierControl {
         return s;
     }
 
-    private static void cache(Prefs p, State s) {
+    private static void cache(Context ctx, Prefs p, State s) {
         if (s.on != null) p.put("lastOn", s.on ? "1" : "0");
         if (s.mode != null) p.put("lastMode", String.valueOf(s.mode));
         if (s.level != null) p.put("lastLevel", String.valueOf(s.level));
@@ -155,6 +157,7 @@ final class PurifierControl {
         if (s.pm25 != null && !s.pm25.isNaN()) p.put("lastPm", String.valueOf(s.pm25));
         p.put("lastSrc", s.source);
         p.putLong("lastTime", System.currentTimeMillis());
+        History.record(ctx, s.pm25, s.on, s.mode, s.level, s.rpm);
     }
 
     // ------------------------------------------------------------------ write
@@ -203,6 +206,38 @@ final class PurifierControl {
             Log.i(TAG, "cloud set " + key + "=" + value + " ok");
         } catch (IOException e) {
             throw localErr != null ? localErr : e;
+        }
+    }
+
+    // ------------------------------------------------------------------ beep
+
+    private static long lastMuteTry;
+
+    /** Chooses whether the purifier beeps when a setting changes; applied by {@link #ensureQuiet}. */
+    static void setMute(Context ctx, boolean mute) {
+        new Prefs(ctx).putInt("mute", mute ? 1 : 0);
+        lastMuteTry = 0;
+        LiveService.pollNow();
+    }
+
+    /**
+     * Sends the purifier's buzzer setting (the beep on every command) whenever it differs from what we last sent.
+     * Silent by default. The setting lives on the purifier, so this is only re-sent after the choice changes.
+     */
+    static void ensureQuiet(Context ctx) {
+        Prefs p = new Prefs(ctx);
+        int want = p.getInt("mute", 1);
+        if (p.getInt("muteSent", -1) == want) return;
+        long now = System.currentTimeMillis();
+        if (now - lastMuteTry < 5 * 60000L) return;
+        lastMuteTry = now;
+        try {
+            write(ctx, "set_buzzer", new JSONArray().put(want == 1 ? "off" : "on"), "b", want != 1);
+            p.putInt("muteSent", want);
+            Log.i(TAG, "purifier beep " + (want == 1 ? "off" : "on"));
+        } catch (IOException e) {
+            if (e.getMessage() != null && e.getMessage().contains("no such control")) p.putInt("muteSent", want);
+            Log.i(TAG, "beep setting not applied: " + e.getMessage());
         }
     }
 

@@ -29,6 +29,8 @@ public class LiveService extends Service {
     private static final int NOTIF_ID = 8;
     private static final long LOCAL_EVERY_MS = 4000;
     private static final long CLOUD_EVERY_MS = 13000;
+    private static final long QUIET_EVERY_MS = 120000;   // screen off: history logging only
+    private static final long SMART_QUIET_EVERY_MS = 45000;  // screen off but Smart fan on: react a bit quicker
 
     static volatile boolean alive;
     private static final Object wake = new Object();
@@ -93,15 +95,24 @@ public class LiveService extends Service {
         long delay = LOCAL_EVERY_MS;
         while (running) {
             if (paused) {
-                // Screen is off: a poll request made now must not turn the wait below into a busy loop.
+                // Screen is off: no widget redraws, but take one cheap reading every couple of minutes so the
+                // air-quality history has no holes. A poll request made now must not turn the wait below
+                // into a busy loop.
                 pollRequested = false;
-                waitFor(60000);
+                try {
+                    SmartFan.onReading(this, Poller.read(this));
+                } catch (IOException | RuntimeException e) {
+                    Log.i(TAG, "background log read failed: " + e.getMessage());
+                }
+                waitFor(SmartFan.enabled(new Prefs(this)) ? SMART_QUIET_EVERY_MS : QUIET_EVERY_MS);
                 continue;
             }
             pollRequested = false;
             try {
                 Poller.Reading r = Poller.read(this);
                 Log.i(TAG, "read " + r.source + ": t=" + r.temp + " h=" + r.hum + " pm=" + r.pm25);
+                SmartFan.onReading(this, r);
+                PurifierControl.ensureQuiet(this);
                 delay = "local".equals(r.source) ? LOCAL_EVERY_MS : CLOUD_EVERY_MS;
             } catch (IOException e) {
                 Log.w(TAG, "poll failed: " + e.getMessage());

@@ -19,9 +19,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingLeft="16dp"
-            android:paddingTop="10dp"
-            android:paddingRight="16dp">
+            android:paddingLeft="14dp"
+            android:paddingTop="8dp"
+            android:paddingRight="14dp">
 
             <View
                 android:layout_width="42dp"
@@ -33,8 +33,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="6dp"
-                android:layout_marginTop="14dp"
-                android:layout_marginRight="4dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginRight="2dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -50,38 +50,38 @@
                         android:layout_height="wrap_content"
                         android:text="Air purifier"
                         android:textColor="#FF1B2430"
-                        android:textSize="22sp" />
+                        android:textSize="20sp" />
 
                     <TextView
                         android:id="@+id/subtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="…"
-                        android:textColor="#FF6B7785"
-                        android:textSize="15sp" />
+                        android:textColor="#FF5F6B7A"
+                        android:textSize="13sp" />
                 </LinearLayout>
 
                 <ImageView
                     android:id="@+id/power"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:background="@drawable/bg_power_off"
-                    android:padding="16dp"
+                    android:padding="13dp"
                     android:src="@drawable/ic_power" />
             </LinearLayout>
 
             <com.nishant.airwidget.AirView
                 android:id="@+id/air"
                 android:layout_width="match_parent"
-                android:layout_height="272dp" />
+                android:layout_height="170dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_card"
                 android:orientation="horizontal"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp">
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -94,16 +94,17 @@
                         android:id="@+id/tempVal"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
                         android:text="--°"
                         android:textColor="#FF1B2430"
-                        android:textSize="26sp" />
+                        android:textSize="22sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Temperature"
                         android:textColor="#FF7A8798"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -117,16 +118,17 @@
                         android:id="@+id/humVal"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
                         android:text="--%"
                         android:textColor="#FF2F6BFF"
-                        android:textSize="26sp" />
+                        android:textSize="22sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Humidity"
                         android:textColor="#FF7A8798"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -140,133 +142,126 @@
                         android:id="@+id/aqiVal"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
                         android:text="--"
                         android:textColor="#FF2E7D32"
-                        android:textSize="26sp" />
+                        android:textSize="22sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="AQI"
                         android:textColor="#FF7A8798"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- mode buttons + fan speed share one card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/bg_card"
-                android:orientation="horizontal"
-                android:paddingLeft="6dp"
-                android:paddingTop="14dp"
-                android:paddingRight="6dp"
-                android:paddingBottom="12dp">
-
-                <LinearLayout
-                    android:id="@+id/optAuto"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:id="@+id/icAuto"
-                        android:layout_width="58dp"
-                        android:layout_height="58dp"
-                        android:background="@drawable/bg_opt_off"
-                        android:padding="16dp"
-                        android:src="@drawable/ic_auto" />
-
-                    <TextView
-                        android:id="@+id/lbAuto"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Auto"
-                        android:textColor="#FF7A8798"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/optSleep"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:id="@+id/icSleep"
-                        android:layout_width="58dp"
-                        android:layout_height="58dp"
-                        android:background="@drawable/bg_opt_off"
-                        android:padding="16dp"
-                        android:src="@drawable/ic_sleep" />
-
-                    <TextView
-                        android:id="@+id/lbSleep"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Sleep"
-                        android:textColor="#FF7A8798"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/optFav"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:id="@+id/icFav"
-                        android:layout_width="58dp"
-                        android:layout_height="58dp"
-                        android:background="@drawable/bg_opt_off"
-                        android:padding="16dp"
-                        android:src="@drawable/ic_fav" />
-
-                    <TextView
-                        android:id="@+id/lbFav"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Favorite"
-                        android:textColor="#FF7A8798"
-                        android:textSize="14sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:paddingLeft="18dp"
-                android:paddingTop="14dp"
-                android:paddingRight="18dp"
-                android:paddingBottom="10dp">
+                android:paddingLeft="14dp"
+                android:paddingTop="8dp"
+                android:paddingRight="14dp"
+                android:paddingBottom="4dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:id="@+id/optAuto"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/icAuto"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_opt_off"
+                            android:padding="12dp"
+                            android:src="@drawable/ic_auto" />
+
+                        <TextView
+                            android:id="@+id/lbAuto"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Auto"
+                            android:textColor="#FF7A8798"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/optSleep"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/icSleep"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_opt_off"
+                            android:padding="12dp"
+                            android:src="@drawable/ic_sleep" />
+
+                        <TextView
+                            android:id="@+id/lbSleep"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Sleep"
+                            android:textColor="#FF7A8798"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/optFav"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/icFav"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_opt_off"
+                            android:padding="12dp"
+                            android:src="@drawable/ic_fav" />
+
+                        <TextView
+                            android:id="@+id/lbFav"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Favorite"
+                            android:textColor="#FF7A8798"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/speedLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="Fan speed"
                     android:textColor="#FF1B2430"
-                    android:textSize="16sp" />
+                    android:textSize="14sp" />
 
                 <SeekBar
                     android:id="@+id/speed"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
                     android:max="10"
                     android:progressTint="#FF2F6BFF"
                     android:thumbTint="#FF2F6BFF" />
@@ -275,42 +270,124 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_card"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="14dp">
-
-                <ImageView
-                    android:layout_width="46dp"
-                    android:layout_height="46dp"
-                    android:background="@drawable/bg_leaf"
-                    android:padding="12dp"
-                    android:src="@drawable/ic_leaf" />
+                android:orientation="vertical"
+                android:paddingLeft="16dp"
+                android:paddingTop="6dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="10dp">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginLeft="14dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <TextView
-                        android:id="@+id/statusTitle"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="…"
+                        android:layout_weight="1"
+                        android:text="Smart fan"
                         android:textColor="#FF1B2430"
-                        android:textSize="17sp" />
+                        android:textSize="15sp" />
 
                     <TextView
-                        android:id="@+id/statusSub"
+                        android:id="@+id/smartEdit"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#FF6B7785"
-                        android:textSize="14sp" />
+                        android:padding="8dp"
+                        android:text="Edit rule"
+                        android:textColor="#FF2F6BFF"
+                        android:textSize="13sp" />
+
+                    <Switch
+                        android:id="@+id/smartSwitch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
                 </LinearLayout>
+
+                <TextView
+                    android:id="@+id/smartRule"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#FF6B7785"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/smartStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text=""
+                    android:textColor="#FF1B2430"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:paddingLeft="12dp"
+                android:paddingTop="10dp"
+                android:paddingRight="12dp"
+                android:paddingBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:paddingLeft="4dp"
+                        android:text="Air quality history"
+                        android:textColor="#FF1B2430"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/rng0"
+                        style="@style/RangeChip"
+                        android:text="1h" />
+
+                    <TextView
+                        android:id="@+id/rng1"
+                        style="@style/RangeChip"
+                        android:text="6h" />
+
+                    <TextView
+                        android:id="@+id/rng2"
+                        style="@style/RangeChip"
+                        android:text="24h" />
+
+                    <TextView
+                        android:id="@+id/rng3"
+                        style="@style/RangeChip"
+                        android:text="7d" />
+                </LinearLayout>
+
+                <com.nishant.airwidget.HistoryView
+                    android:id="@+id/hist"
+                    android:layout_width="match_parent"
+                    android:layout_height="168dp"
+                    android:layout_marginTop="4dp" />
+
+                <TextView
+                    android:id="@+id/histSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:paddingLeft="4dp"
+                    android:paddingRight="4dp"
+                    android:text=""
+                    android:textColor="#FF3C4857"
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <TextView
@@ -318,10 +395,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:paddingTop="8dp"
+                android:paddingTop="4dp"
                 android:text=""
-                android:textColor="#FF9AA5B4"
-                android:textSize="11sp" />
+                android:textColor="#FFB04A4A"
+                android:textSize="11sp"
+                android:visibility="gone" />
         </LinearLayout>
     </ScrollView>
 </FrameLayout>

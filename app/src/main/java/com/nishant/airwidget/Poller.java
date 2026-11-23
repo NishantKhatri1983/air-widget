@@ -16,7 +16,7 @@ final class Poller {
     static final class Reading {
         Double temp, hum, pm25;
         Boolean on;
-        Integer mode, level;
+        Integer mode, level, rpm;
         String source;
     }
 
@@ -50,7 +50,7 @@ final class Poller {
                     }
                 }
                 r.source = "local";
-                save(p, r);
+                save(ctx, p, r);
                 return r;
             } catch (IOException e) {
                 localErr = e;
@@ -62,7 +62,7 @@ final class Poller {
         if (legacy) throw localErr != null ? localErr : new IOException("legacy model needs local access");
         Reading r = cloudMiot(ctx, p);
         r.source = "cloud";
-        save(p, r);
+        save(ctx, p, r);
 
         // Local failed but cloud works: the purifier's IP may have changed -> refresh it now and then.
         if (localErr != null && System.currentTimeMillis() - devicesRefreshedAt > 10 * 60000L) {
@@ -88,15 +88,27 @@ final class Poller {
             boolean ok = SpecResolver.resolve(p);
             p.putInt("specDone", 2);
             p.putInt("legacy", ok ? 0 : 1);
+        } else if (p.getInt("specRpm", 0) == 0 && !rpmSpecTried) {
+            // Set-up from an older version: look the fan-speed property up once. Failure (e.g. no internet
+            // on this Wi-Fi) is harmless - the local classic protocol reports fan speed without it.
+            rpmSpecTried = true;
+            try {
+                SpecResolver.resolve(p);
+            } catch (IOException e) {
+                Log.i(TAG, "fan speed spec lookup failed: " + e.getMessage());
+            }
         }
     }
+
+    private static boolean rpmSpecTried;
 
     private static JSONArray miotParams(Prefs p) throws IOException {
         JSONArray a = new JSONArray();
         try {
             int[][] ids = {{p.getInt("tS", 0), p.getInt("tP", 0)}, {p.getInt("hS", 0), p.getInt("hP", 0)},
                     {p.getInt("pS", 0), p.getInt("pP", 0)}, {p.getInt("oS", 0), p.getInt("oP", 0)},
-                    {p.getInt("mS", 0), p.getInt("mP", 0)}, {p.getInt("fS", 0), p.getInt("fP", 0)}};
+                    {p.getInt("mS", 0), p.getInt("mP", 0)}, {p.getInt("fS", 0), p.getInt("fP", 0)},
+                    {p.getInt("rS", 0), p.getInt("rP", 0)}};
             for (int[] id : ids) {
                 if (id[0] > 0) a.put(new JSONObject().put("did", p.did()).put("siid", id[0]).put("piid", id[1]));
             }
@@ -116,6 +128,7 @@ final class Poller {
             if (s == p.getInt("oS", -1) && pi == p.getInt("oP", -1)) { r.on = o.optBoolean("value"); continue; }
             if (s == p.getInt("mS", -1) && pi == p.getInt("mP", -1)) { r.mode = o.optInt("value"); continue; }
             if (s == p.getInt("fS", -1) && pi == p.getInt("fP", -1)) { r.level = o.optInt("value"); continue; }
+            if (s == p.getInt("rS", -1) && pi == p.getInt("rP", -1)) { r.rpm = o.optInt("value"); continue; }
             double v = o.optDouble("value", Double.NaN);
             if (Double.isNaN(v)) continue;
             if (s == p.getInt("tS", -1) && pi == p.getInt("tP", -1)) r.temp = v;
@@ -133,7 +146,7 @@ final class Poller {
 
     private static Reading localLegacy(Prefs p) throws IOException {
         JSONArray names = new JSONArray().put("aqi").put("humidity").put("temp_dec")
-                .put("power").put("mode").put("favorite_level");
+                .put("power").put("mode").put("favorite_level").put("motor1_speed");
         JSONArray res = MiioLocal.call(p.ip(), p.token(), "get_prop", names, 1500);
         Reading r = new Reading();
         if (res.length() >= 3) {
@@ -145,6 +158,10 @@ final class Poller {
             r.on = "on".equals(res.optString(3));
             r.mode = PurifierControl.modeFromLegacy(res.optString(4));
             r.level = res.isNull(5) ? null : Integer.valueOf(res.optInt(5));
+        }
+        if (res.length() >= 7 && !res.isNull(6)) {
+            int rpm = res.optInt(6, -1);
+            if (rpm >= 0) r.rpm = rpm;
         }
         // While the purifier is off some sensors may report nothing; keep the power/mode state anyway.
         if (r.temp != null && r.temp.isNaN()) r.temp = null;
@@ -174,7 +191,7 @@ final class Poller {
         return r;
     }
 
-    private static void save(Prefs p, Reading r) {
+    private static void save(Context ctx, Prefs p, Reading r) {
         // Keep the previous number when a sensor reports nothing (e.g. while the purifier is off).
         if (r.temp != null) p.put("lastTemp", String.valueOf(r.temp));
         if (r.hum != null) p.put("lastHum", String.valueOf(r.hum));
@@ -184,5 +201,6 @@ final class Poller {
         if (r.level != null) p.put("lastLevel", String.valueOf(r.level));
         p.put("lastSrc", r.source);
         p.putLong("lastTime", System.currentTimeMillis());
+        History.record(ctx, r.pm25, r.on, r.mode, r.level, r.rpm);
     }
 }
