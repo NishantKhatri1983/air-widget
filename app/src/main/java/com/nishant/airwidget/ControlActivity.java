@@ -33,7 +33,7 @@ public class ControlActivity extends Activity {
     private HistoryView hist;
     private int topInset;
     private android.widget.Switch smartSwitch;
-    private TextView smartRule, smartStatus;
+    private TextView smartRule, smartStatus, smartTurbo;
     private TextView histSummary;
     private final TextView[] chips = new TextView[4];
     private static final long[] RANGE_MS = {3600_000L, 6 * 3600_000L, 24 * 3600_000L, 7 * 24 * 3600_000L};
@@ -80,6 +80,17 @@ public class ControlActivity extends Activity {
             renderSmart();
         });
         findViewById(R.id.smartEdit).setOnClickListener(v -> editSmartRule());
+        smartTurbo = findViewById(R.id.smartTurbo);
+        smartTurbo.setOnClickListener(v -> {
+            Prefs p = new Prefs(this);
+            boolean turbo = !SmartFan.rule(p).fast;
+            SmartFan.setFast(p, turbo);
+            if (turbo && !SmartFan.enabled(p)) {          // Turbo also starts the Smart fan
+                if (Boolean.TRUE.equals(st.on)) SmartFan.setEnabled(this, true);
+                else Toast.makeText(this, "Turbo is set - turn the purifier on to start Smart fan", Toast.LENGTH_SHORT).show();
+            }
+            renderSmart();
+        });
         histSummary = findViewById(R.id.histSummary);
         int[] chipIds = {R.id.rng0, R.id.rng1, R.id.rng2, R.id.rng3};
         for (int i = 0; i < chips.length; i++) {
@@ -323,6 +334,9 @@ public class ControlActivity extends Activity {
         boolean on = SmartFan.enabled(p);
         if (smartSwitch.isChecked() != on) smartSwitch.setChecked(on);
         smartRule.setText(SmartFan.rule(p).describe());
+        boolean turbo = SmartFan.rule(p).fast;
+        smartTurbo.setBackgroundResource(turbo ? R.drawable.bg_turbo_on : R.drawable.bg_turbo_off);
+        smartTurbo.setTextColor(turbo ? 0xFFFFFFFF : 0xFF5B6676);
         String s = SmartFan.status(p);
         smartStatus.setText(s.isEmpty() ? "Off" : s);
     }
@@ -344,6 +358,10 @@ public class ControlActivity extends Activity {
         mute.setText("Mute the purifier's beep when settings change");
         mute.setChecked(p.getInt("mute", 1) == 1);
         col.addView(mute);
+        final android.widget.CheckBox fast = new android.widget.CheckBox(this);
+        fast.setText("Fast ramp-up: raise the fan on the first high reading, check every 20 s while the screen is off");
+        fast.setChecked(r.fast);
+        col.addView(fast);
         final android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         scroll.addView(col);
         new android.app.AlertDialog.Builder(this)
@@ -354,7 +372,7 @@ public class ControlActivity extends Activity {
                     int a = num(start, r.start), b = num(first, r.startLevel), c = num(step, r.step), l = num(low, r.low);
                     SmartFan.saveRule(p, Math.max(0, Math.min(500, a)), Math.max(1, Math.min(200, c)),
                             Math.max(0, Math.min(r.max, b)), Math.max(0, Math.min(r.max, l)),
-                            Math.max(0, Math.min(600, num(hold, r.holdSec))), Math.max(0, Math.min(25, num(margin, r.margin))));
+                            Math.max(0, Math.min(600, num(hold, r.holdSec))), Math.max(0, Math.min(25, num(margin, r.margin))), fast.isChecked());
                     if (mute.isChecked() != (p.getInt("mute", 1) == 1)) PurifierControl.setMute(this, mute.isChecked());
                     renderSmart();
                 })

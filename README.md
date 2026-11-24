@@ -33,6 +33,10 @@ Built and tested with a Mi Air Purifier 2 (`zhimi.airpurifier.m1`) on Android 17
   instead of fighting you. It never turns the purifier on. The history graph and summary mark the periods the Smart fan
   was steering the fan (green) separately from Auto, Sleep and manual Favorite. The purifier's beep on every change is
   switched off by default (a checkbox in *Edit rule* turns it back on).
+  An optional **Fast ramp-up** checkbox (*Edit rule*, off by default) makes it quicker going up only: the fan is raised on
+  the first reading that calls for it (latest reading, not the average) with just 10 s between raises, and with the screen
+  off it reads every 20 s while the air is at or above the start AQI or jumped 5+ AQI. Lowering is unchanged. The
+  **⚡ Turbo** button on the Smart fan row is a one-tap switch for the same setting (it also starts the Smart fan).
 - **Control sheet** – tap the widget (everything fits on one screen; the animated purifier shrinks to make room). Fan speed is shown on the same 1-10 scale as the slider, including Auto, where the speed is derived from the measured rpm using what each level produced in Favorite mode. Old models such as the m1 only understand the classic miIO calls
   (`set_power`, `set_mode`, `set_level_favorite`); newer MIoT models are handled through `set_properties`.
 

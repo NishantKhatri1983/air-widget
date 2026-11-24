@@ -19,12 +19,16 @@ final class SmartFan {
     private static final String TAG = "AirWidget";
     private static final long MIN_GAP_MS = 45_000;
     private static final long GRACE_MS = 20_000;
+    private static final long FAST_GAP_MS = 10_000;    // fast ramp-up: minimum time between two "raise" commands
+    private static final long FAST_POLL_MS = 20_000;   // fast ramp-up: screen-off reading pace while the air is high / rising
+    private static final double RISE_AQI = 5;          // a jump this big since the previous reading counts as "rising"
 
     /** The AQI -> fan level rule. */
     static final class Rule {
         int start = 50, step = 25, startLevel = 2, low = 1, max = 10;
         int holdSec = 90;      // air must stay at the lower level this long before the fan is lowered
         int margin = 5;        // extra AQI under the threshold required before lowering (0 = exactly at the step)
+        boolean fast;          // fast ramp-up: raise the fan on the latest reading, no average / confirmation / cooldown
 
         int levelFor(double aqi) {
             int lv;
@@ -48,10 +52,12 @@ final class SmartFan {
         r.low = p.getInt("smartLow", 1);
         r.holdSec = Math.max(0, p.getInt("smartHold", 90));
         r.margin = Math.max(0, p.getInt("smartMargin", 5));
+        r.fast = p.getInt("smartFast", 0) == 1;
         return r;
     }
 
-    static void saveRule(Prefs p, int start, int step, int first, int low, int holdSec, int margin) {
+    static void saveRule(Prefs p, int start, int step, int first, int low, int holdSec, int margin, boolean fast) {
+        p.putInt("smartFast", fast ? 1 : 0);
         p.putInt("smartHold", holdSec);
         p.putInt("smartMargin", margin);
         p.putInt("smartStart", start);
@@ -60,8 +66,15 @@ final class SmartFan {
         p.putInt("smartLow", low);
     }
 
+    static void setFast(Prefs p, boolean fast) { p.putInt("smartFast", fast ? 1 : 0); }
+
     static boolean enabled(Prefs p) { return p.getInt("smart", 0) == 1; }
     static String status(Prefs p) { return p.get("smartStatus"); }
+
+    /** Screen-off polling interval while fast ramp-up is on and the air is high or climbing; 0 = no special pace. */
+    static long hotPollMs(Prefs p) {
+        return enabled(p) && p.getInt("smartFast", 0) == 1 && hot ? FAST_POLL_MS : 0;
+    }
 
     // ---- state of the running controller (lives as long as the process)
     private static final double[] recent = new double[3];
@@ -70,6 +83,8 @@ final class SmartFan {
     private static long lastCmdAt, downSince;
     private static int upCount, mismatch;
     private static boolean takeover;       // first reading after enabling: switch to Favorite and set the level
+    private static volatile boolean hot;   // latest reading is at/above the start AQI or jumped up
+    private static double prevAqi = Double.NaN;
 
     static synchronized void setEnabled(Context ctx, boolean on) {
         Prefs p = new Prefs(ctx);
@@ -97,6 +112,8 @@ final class SmartFan {
         upCount = 0;
         mismatch = 0;
         takeover = false;
+        hot = false;
+        prevAqi = Double.NaN;
     }
 
     /** Feed every reading in; sends a command to the purifier when the level should change. */
@@ -113,6 +130,8 @@ final class SmartFan {
         double avg = 0;
         for (int i = 0; i < recentN; i++) avg += recent[i];
         avg /= recentN;
+        hot = aqi >= rule.start || (!Double.isNaN(prevAqi) && aqi - prevAqi >= RISE_AQI);
+        prevAqi = aqi;
 
         if (r.on == null) return;
         if (!r.on) {
@@ -133,14 +152,14 @@ final class SmartFan {
         }
 
         int cur = expected != null ? expected : r.level != null && fav ? r.level : -1;
-        int up = rule.levelFor(avg);
+        int up = rule.levelFor(rule.fast ? Math.max(aqi, avg) : avg);   // fast: react to the latest reading
         int down = rule.levelFor(avg + rule.margin);
         Integer want = null;
         if (takeover || cur < 0) {
             want = up;
         } else if (up > cur) {
             downSince = 0;
-            if (++upCount >= 2) want = up;
+            if (++upCount >= (rule.fast ? 1 : 2)) want = up;
         } else {
             upCount = 0;
             if (down < cur) {
@@ -151,7 +170,8 @@ final class SmartFan {
             }
         }
 
-        if (want != null && !takeover && now - lastCmdAt < MIN_GAP_MS) want = null;   // too soon after the last change
+        long gap = rule.fast && cur >= 0 && want != null && want > cur ? FAST_GAP_MS : MIN_GAP_MS;
+        if (want != null && !takeover && now - lastCmdAt < gap) want = null;   // too soon after the last change
 
         if (want != null && (takeover || !fav || want != cur)) {
             try {
@@ -178,6 +198,7 @@ final class SmartFan {
         } else if (cur >= 0 && up > cur) {
             st += " · to level " + up + " next";
         }
+        if (rule.fast) st += " · fast";
         p.put("smartStatus", st);
     }
 

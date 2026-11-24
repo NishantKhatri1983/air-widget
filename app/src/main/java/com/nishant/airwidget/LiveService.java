@@ -104,7 +104,9 @@ public class LiveService extends Service {
                 } catch (IOException | RuntimeException e) {
                     Log.i(TAG, "background log read failed: " + e.getMessage());
                 }
-                waitFor(SmartFan.enabled(new Prefs(this)) ? SMART_QUIET_EVERY_MS : QUIET_EVERY_MS);
+                Prefs sp = new Prefs(this);
+                long hotMs = SmartFan.hotPollMs(sp);     // fast ramp-up while the air is high or climbing
+                waitFor(hotMs > 0 ? hotMs : SmartFan.enabled(sp) ? SMART_QUIET_EVERY_MS : QUIET_EVERY_MS);
                 continue;
             }
             pollRequested = false;
