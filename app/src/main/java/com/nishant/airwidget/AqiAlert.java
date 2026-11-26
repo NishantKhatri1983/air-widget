@@ -7,6 +7,8 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
+import android.os.Bundle;
 
 /**
  * "Very poor air" reminder: a notification that appears when the AQI shown in the widget goes above {@link #HIGH},
@@ -66,18 +68,24 @@ final class AqiAlert {
         PendingIntent swipe = PendingIntent.getBroadcast(ctx, 10,
                 new Intent(ctx, Dismissed.class), flags);
 
-        Notification n = new Notification.Builder(ctx, CHANNEL)
+        // A "Live Update": ongoing + a request to be promoted, so Android 16+ shows a pill with the number in the
+        // status bar. Older versions just show it as an ordinary notification.
+        Bundle extras = new Bundle();
+        extras.putBoolean("android.requestPromotedOngoing", true);
+        Notification.Builder b = new Notification.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notif)
                 .setContentTitle("Air quality very poor · AQI " + aqi)
                 .setContentText(miHome ? "Tap to open Mi Home · swipe to dismiss" : "Tap to open · swipe to dismiss")
+                .setColor(0xFFD32F2F)
                 .setContentIntent(tap)
                 .setDeleteIntent(swipe)
+                .addExtras(extras)
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(false)
-                .setOngoing(false)
-                .setShowWhen(false)
-                .build();
-        nm.notify(NOTIF_ID, n);
+                .setOngoing(true)
+                .setShowWhen(false);
+        if (Build.VERSION.SDK_INT >= 36) b.setShortCriticalText("AQI " + aqi);
+        nm.notify(NOTIF_ID, b.build());
     }
 
     /** Swiping the notification away: stay quiet until the air has cleared and got bad again. */

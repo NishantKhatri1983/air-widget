@@ -41,7 +41,7 @@ Built and tested with a Mi Air Purifier 2 (`zhimi.airpurifier.m1`) on Android 17
   changes within 60 s of the Smart fan's own command, it puts Favorite and its level back (at most twice in 10 minutes,
   then it switches off as for any other outside change).
 - **Very poor air alert** – when the AQI shown in the widget goes above 225 a notification ("Air quality very poor · AQI 262")
-  appears, with a short heads-up and sound the first time, then updates its number quietly. Swipe it away to dismiss it;
+  appears as a Live Update (Android 16+: a status-bar pill showing "AQI 262"), with a short heads-up and sound the first time, then updates its number quietly. Swipe it away to dismiss it;
   it comes back only after the AQI has dropped below 100 and gone above 225 again. It closes by itself when the AQI falls
   below 100. Tapping it opens Mi Home if installed, otherwise the control sheet. Needs the notification permission.
 - **Debug event log** – the app quietly writes `events.log` (about 1 MB at most) to its folder on shared storage
@@ -54,7 +54,7 @@ Built and tested with a Mi Air Purifier 2 (`zhimi.airpurifier.m1`) on Android 17
 
 ## Download
 
-Latest prebuilt APK (debug-signed): [apk/air-widget-v1.2.apk](apk/air-widget-v1.2.apk), also attached to the [v1.2 release](https://github.com/NishantKhatri1983/air-widget/releases/tag/v1.2). Older: [v1.1](apk/air-widget-v1.1.apk), [v1.0](apk/air-widget-v1.0.apk). Don't install an older APK over a newer one.
+Latest prebuilt APK (debug-signed): [apk/air-widget-v1.6.apk](apk/air-widget-v1.6.apk), also attached to the [v1.6 release](https://github.com/NishantKhatri1983/air-widget/releases/tag/v1.6). Older: [v1.2](apk/air-widget-v1.2.apk), [v1.1](apk/air-widget-v1.1.apk), [v1.0](apk/air-widget-v1.0.apk). Don't install an older APK over a newer one.
 
 ## Build
 
