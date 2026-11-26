@@ -157,7 +157,8 @@ final class PurifierControl {
         if (s.pm25 != null && !s.pm25.isNaN()) p.put("lastPm", String.valueOf(s.pm25));
         p.put("lastSrc", s.source);
         p.putLong("lastTime", System.currentTimeMillis());
-        History.record(ctx, s.pm25, s.on, s.mode, s.level, s.rpm);
+        History.record(ctx, s.pm25, s.on, s.mode, s.level, s.rpm, s.temp, s.hum);
+        AqiAlert.update(ctx, s.pm25);
     }
 
     // ------------------------------------------------------------------ write
@@ -186,6 +187,7 @@ final class PurifierControl {
                     try {
                         JSONArray prm = new JSONArray().put(miotItem(p, key, value));
                         checkSetResult(MiioLocal.call(p.ip(), p.token(), "set_properties", prm, 1500));
+                        EventLog.command(ctx, key + "=" + value + " (local)", "ok");
                         return;
                     } catch (IOException e) {
                         if (e.getMessage() == null || !e.getMessage().contains("-32601")) throw e;
@@ -195,16 +197,20 @@ final class PurifierControl {
                 JSONArray r = MiioLocal.call(p.ip(), p.token(), legacyMethod, legacyParams, 1500);
                 if (r.length() > 0 && !"ok".equals(r.optString(0))) throw new IOException("device said " + r);
                 Log.i(TAG, "local " + legacyMethod + " " + legacyParams + " -> " + r);
+                EventLog.command(ctx, legacyMethod + " " + legacyParams, "ok " + r);
                 return;
             } catch (IOException e) {
                 localErr = e;
                 Log.i(TAG, "local write failed: " + e.getMessage());
+                EventLog.command(ctx, legacyMethod + " " + legacyParams + " (local)", "failed: " + e.getMessage());
             }
         }
         try {
             new XiaomiCloud(ctx).setProps(new JSONArray().put(miotItem(p, key, value)));
             Log.i(TAG, "cloud set " + key + "=" + value + " ok");
+            EventLog.command(ctx, key + "=" + value + " (cloud)", "ok");
         } catch (IOException e) {
+            EventLog.command(ctx, key + "=" + value + " (cloud)", "failed: " + e.getMessage());
             throw localErr != null ? localErr : e;
         }
     }

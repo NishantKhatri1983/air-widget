@@ -19,7 +19,9 @@ final class SmartFan {
     private static final String TAG = "AirWidget";
     private static final long MIN_GAP_MS = 45_000;
     private static final long GRACE_MS = 20_000;
-    private static final long FAST_GAP_MS = 10_000;    // fast ramp-up: minimum time between two "raise" commands
+    private static final long FLIP_WINDOW_MS = 60_000;   // a mode change this soon after our command = the purifier's own doing
+    private static final long FLIP_PERIOD_MS = 10 * 60_000;   // at most 2 restores per this period
+    private static final long FAST_GAP_MS = 10_000;   // fast ramp-up: minimum time between two "raise" commands
     private static final long FAST_POLL_MS = 20_000;   // fast ramp-up: screen-off reading pace while the air is high / rising
     private static final double RISE_AQI = 5;          // a jump this big since the previous reading counts as "rising"
 
@@ -85,6 +87,7 @@ final class SmartFan {
     private static boolean takeover;       // first reading after enabling: switch to Favorite and set the level
     private static volatile boolean hot;   // latest reading is at/above the start AQI or jumped up
     private static double prevAqi = Double.NaN;
+    private static long flipA, flipB;          // times of the two latest "purifier flipped to Auto" restores (kept across reset)
 
     static synchronized void setEnabled(Context ctx, boolean on) {
         Prefs p = new Prefs(ctx);
@@ -92,6 +95,7 @@ final class SmartFan {
         reset();
         takeover = on;
         p.put("smartStatus", on ? "Starting…" : "Off");
+        EventLog.event(ctx, "smart fan " + (on ? "switched on" : "switched off") + " (" + EventLog.source() + (rule(p).fast ? ", turbo" : "") + ")");
         if (on) LiveService.pollNow();
     }
 
@@ -101,6 +105,7 @@ final class SmartFan {
         if (!enabled(p)) return;
         p.putInt("smart", 0);
         p.put("smartStatus", "Off — you changed the fan");
+        EventLog.event(ctx, "smart fan off: you changed the fan in the app");
         reset();
     }
 
@@ -141,11 +146,35 @@ final class SmartFan {
         }
         boolean fav = r.mode != null && r.mode == PurifierControl.FAVORITE;
 
+        // The purifier sometimes flips itself to Auto seconds after we raise the fan in a sharp spike. If that happens
+        // soon after our own command, put Favorite and our level back (at most twice in 10 minutes), don't give up.
+        if (!takeover && r.mode != null && !fav && expected != null && lastCmdAt != 0
+                && now - lastCmdAt <= FLIP_WINDOW_MS && flipsAllowed(now)) {
+            int lv = expected;
+            long since = (now - lastCmdAt) / 1000;
+            try {
+                PurifierControl.setMode(ctx, PurifierControl.FAVORITE);
+                sleep(400);
+                PurifierControl.setLevel(ctx, lv);
+            } catch (IOException e) {
+                p.put("smartStatus", "Couldn't reach the purifier");
+                return;
+            }
+            flipB = flipA;
+            flipA = now;
+            lastCmdAt = now;
+            mismatch = 0;
+            EventLog.event(ctx, "smart fan: purifier flipped to mode " + r.mode + " "
+                    + since + " s after our command; restored Favorite level " + lv);
+            p.put("smartStatus", "Level " + lv + " · restored after the purifier switched to Auto");
+            return;
+        }
+
         if (!takeover && now - lastCmdAt > GRACE_MS) {
             // Somebody else changed the mode or the level -> hand control back.
-            if (r.mode != null && !fav) { pause(p, "mode was changed elsewhere"); return; }
+            if (r.mode != null && !fav) { pause(ctx, p, "mode was changed elsewhere (now " + r.mode + ")"); return; }
             if (fav && expected != null && r.level != null && r.level.intValue() != expected.intValue()) {
-                if (++mismatch >= 2) { pause(p, "fan level was changed elsewhere"); return; }
+                if (++mismatch >= 2) { pause(ctx, p, "fan level was changed elsewhere (now " + r.level + ", expected " + expected + ")"); return; }
             } else {
                 mismatch = 0;
             }
@@ -202,11 +231,17 @@ final class SmartFan {
         p.put("smartStatus", st);
     }
 
-    private static void pause(Prefs p, String why) {
+    /** True while fewer than FLIP_MAX restores happened in the last FLIP_PERIOD_MS. */
+    private static boolean flipsAllowed(long now) {
+        return now - flipB > FLIP_PERIOD_MS;   // flipB is the older of the two latest restores
+    }
+
+    private static void pause(Context ctx, Prefs p, String why) {
         p.putInt("smart", 0);
         p.put("smartStatus", "Off — " + why);
         reset();
         Log.i(TAG, "smart fan off: " + why);
+        EventLog.event(ctx, "smart fan off: " + why);
     }
 
     private static void sleep(long ms) {

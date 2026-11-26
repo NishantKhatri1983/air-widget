@@ -77,6 +77,7 @@ public class LiveService extends Service {
             registerTriggers();
             worker = new Thread(this::loop, "air-live");
             worker.start();
+            EventLog.event(this, "service started (screen " + (paused ? "off" : "on") + ")");
         }
         pollNow();
         return START_STICKY;
@@ -86,6 +87,7 @@ public class LiveService extends Service {
     public void onDestroy() {
         running = false;
         alive = false;
+        EventLog.event(this, "service stopped");
         unregisterTriggers();
         synchronized (wake) { wake.notifyAll(); }
         super.onDestroy();
@@ -101,8 +103,11 @@ public class LiveService extends Service {
                 pollRequested = false;
                 try {
                     SmartFan.onReading(this, Poller.read(this));
+                    EventLog.reach(this, true, null);
+                    EventLog.clock(this);
                 } catch (IOException | RuntimeException e) {
                     Log.i(TAG, "background log read failed: " + e.getMessage());
+                    EventLog.reach(this, false, e.getMessage());
                 }
                 Prefs sp = new Prefs(this);
                 long hotMs = SmartFan.hotPollMs(sp);     // fast ramp-up while the air is high or climbing
@@ -115,9 +120,12 @@ public class LiveService extends Service {
                 Log.i(TAG, "read " + r.source + ": t=" + r.temp + " h=" + r.hum + " pm=" + r.pm25);
                 SmartFan.onReading(this, r);
                 PurifierControl.ensureQuiet(this);
+                EventLog.reach(this, true, null);
+                EventLog.clock(this);
                 delay = "local".equals(r.source) ? LOCAL_EVERY_MS : CLOUD_EVERY_MS;
             } catch (IOException e) {
                 Log.w(TAG, "poll failed: " + e.getMessage());
+                EventLog.reach(this, false, e.getMessage());
                 delay = e instanceof XiaomiCloud.AuthException ? 5 * 60000L : CLOUD_EVERY_MS;
             } catch (RuntimeException e) {
                 Log.e(TAG, "poll crashed", e);

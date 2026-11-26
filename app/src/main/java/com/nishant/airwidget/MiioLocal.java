@@ -23,6 +23,23 @@ final class MiioLocal {
     /** Sends one RPC and returns the "result" array. UDP can drop a packet, so one retry on timeout. */
     static synchronized JSONArray call(String ip, String tokenHex, String method, JSONArray params, int timeoutMs)
             throws IOException {
+        Object o = callRetry(ip, tokenHex, method, params, timeoutMs);
+        if (!(o instanceof JSONArray)) throw new IOException("bad miIO reply: " + XiaomiCloud.abbreviate(String.valueOf(o)));
+        return (JSONArray) o;
+    }
+
+    /** The device's own clock (seconds, from the last hello); it restarts from low numbers when the device reboots. */
+    static volatile long deviceClock = -1;
+
+    /** miIO.info answers with an object (firmware, Wi-Fi signal, uptime) rather than a list. */
+    static synchronized org.json.JSONObject info(String ip, String tokenHex, int timeoutMs) throws IOException {
+        Object o = callRetry(ip, tokenHex, "miIO.info", new JSONArray(), timeoutMs);
+        if (!(o instanceof org.json.JSONObject)) throw new IOException("bad miIO.info reply");
+        return (org.json.JSONObject) o;
+    }
+
+    private static Object callRetry(String ip, String tokenHex, String method, JSONArray params, int timeoutMs)
+            throws IOException {
         try {
             return callOnce(ip, tokenHex, method, params, timeoutMs);
         } catch (SocketTimeoutException e) {
@@ -35,7 +52,7 @@ final class MiioLocal {
         }
     }
 
-    private static JSONArray callOnce(String ip, String tokenHex, String method, JSONArray params, int timeoutMs)
+    private static Object callOnce(String ip, String tokenHex, String method, JSONArray params, int timeoutMs)
             throws IOException {
         if (tokenHex == null || tokenHex.length() != 32) throw new IOException("no usable local token");
         byte[] token = Crypto.hex(tokenHex);
@@ -58,6 +75,7 @@ final class MiioLocal {
             long helloAt = System.currentTimeMillis();
             byte[] devId = Arrays.copyOfRange(buf, 8, 12);
             long stamp = ((buf[12] & 0xffL) << 24) | ((buf[13] & 0xffL) << 16) | ((buf[14] & 0xffL) << 8) | (buf[15] & 0xffL);
+            deviceClock = stamp;
 
             // 2. request
             JSONObject req = new JSONObject();
@@ -100,7 +118,7 @@ final class MiioLocal {
             try {
                 JSONObject resp = new JSONObject(text);
                 if (resp.has("error")) throw new IOException("miIO error " + resp.getJSONObject("error"));
-                return resp.getJSONArray("result");
+                return resp.get("result");
             } catch (JSONException e) {
                 throw new IOException("bad miIO reply: " + XiaomiCloud.abbreviate(text));
             }

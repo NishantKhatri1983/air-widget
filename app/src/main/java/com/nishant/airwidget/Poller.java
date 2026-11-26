@@ -201,6 +201,7 @@ final class Poller {
         if (r.level != null) p.put("lastLevel", String.valueOf(r.level));
         p.put("lastSrc", r.source);
         p.putLong("lastTime", System.currentTimeMillis());
-        History.record(ctx, r.pm25, r.on, r.mode, r.level, r.rpm);
+        History.record(ctx, r.pm25, r.on, r.mode, r.level, r.rpm, r.temp, r.hum);
+        AqiAlert.update(ctx, r.pm25);
     }
 }

@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <queries>
+        <package android:name="com.xiaomi.smarthome" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
@@ -55,6 +59,10 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Polls the user's own Xiaomi air purifier every few seconds so a home-screen widget shows live temperature, humidity and AQI" />
         </service>
+
+        <receiver
+            android:name=".AqiAlert$Dismissed"
+            android:exported="false" />
 
         <receiver
             android:name=".BootReceiver"

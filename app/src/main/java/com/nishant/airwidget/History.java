@@ -18,8 +18,9 @@ import java.util.List;
  * Rolling log of the purifier's readings (PM2.5, power, mode, fan speed) so the control sheet can draw
  * how the air quality moved over time. One CSV line per sample in app-private storage, kept for 7 days.
  *
- * Line: {@code epochSeconds,pm25,on,mode,level,rpm,smart} - an empty field means "not reported"; the last column
- * (1 = Smart fan in control) is missing in older rows.
+ * Line: {@code epochSeconds,pm25,on,mode,level,rpm,smart,temp,hum} - an empty field means "not reported"; smart
+ * (1 = Smart fan in control) is missing in older rows, temp and hum in rows older than v1.5. A copy is kept in the
+ * app's shared-storage folder (Android/data/com.nishant.airwidget/files/history.csv) for troubleshooting.
  */
 final class History {
     private static final String TAG = "AirWidget";
@@ -60,10 +61,15 @@ final class History {
     static int version() { return version; }
 
     /** Logs a reading if it is time for one or something worth marking changed. Safe to call every few seconds. */
+    static void record(Context ctx, Double pmIn, Boolean onIn, Integer modeIn, Integer levelIn, Integer rpmIn) {
+        record(ctx, pmIn, onIn, modeIn, levelIn, rpmIn, null, null);
+    }
+
     static synchronized void record(Context ctx, Double pmIn, Boolean onIn, Integer modeIn, Integer levelIn,
-                                    Integer rpmIn) {
+                                    Integer rpmIn, Double tempIn, Double humIn) {
         double pm = pmIn == null || pmIn.isNaN() ? Double.NaN : pmIn;
         if (Double.isNaN(pm) && onIn == null) return;
+        EventLog.state(ctx, pmIn, onIn, modeIn, levelIn, rpmIn);
         File f = file(ctx);
         long now = System.currentTimeMillis();
         if (!loaded) loadLast(f);
@@ -82,19 +88,58 @@ final class History {
         if (!(stateChanged || dt >= EVERY_MS || (moved && dt >= MIN_GAP_MS))) return;
 
         String line = (now / 1000) + "," + (Double.isNaN(pm) ? "" : trim(pm)) + "," + (on < 0 ? "" : on) + ","
-                + (mode < 0 ? "" : mode) + "," + (level < 0 ? "" : level) + "," + (rpm < 0 ? "" : rpm) + "," + smart + "\n";
+                + (mode < 0 ? "" : mode) + "," + (level < 0 ? "" : level) + "," + (rpm < 0 ? "" : rpm) + "," + smart + ","
+                + (tempIn == null || tempIn.isNaN() ? "" : trim(tempIn)) + "," + (humIn == null || humIn.isNaN() ? "" : trim(humIn)) + "\n";
         try (FileOutputStream out = new FileOutputStream(f, true)) {
             out.write(line.getBytes(StandardCharsets.US_ASCII));
         } catch (IOException e) {
             Log.w(TAG, "history write failed: " + e.getMessage());
             return;
         }
+        mirror(ctx, f, line);
         lastT = now;
         if (!Double.isNaN(pm)) lastPm = pm;
         lastOn = on; lastMode = mode; lastLevel = level; lastSmart = smart;
         if (rpm >= 0) lastRpm = rpm;
         version++;
-        if (now - lastPrune > PRUNE_EVERY_MS) prune(f, now);
+        if (now - lastPrune > PRUNE_EVERY_MS) {
+            prune(f, now);
+            File m = mirrorFile(ctx);
+            if (m != null && m.exists()) prune(m, now);
+        }
+    }
+
+    // ---- copy in the app's shared-storage folder so it can be pulled with adb for troubleshooting
+    private static boolean mirrorChecked;
+
+    private static File mirrorFile(Context ctx) {
+        File dir = ctx.getApplicationContext().getExternalFilesDir(null);
+        return dir == null ? null : new File(dir, "history.csv");
+    }
+
+    /** Appends the same line to the shared-storage copy; the first time it also copies what is already logged. */
+    private static void mirror(Context ctx, File internal, String line) {
+        try {
+            File m = mirrorFile(ctx);
+            if (m == null) return;
+            if (!mirrorChecked) {
+                mirrorChecked = true;
+                if (!m.exists()) {
+                    // copy everything except the line just written, which is appended below
+                    try (FileInputStream in = new FileInputStream(internal); FileOutputStream out = new FileOutputStream(m)) {
+                        byte[] buf = new byte[8192];
+                        int n;
+                        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                    }
+                    return;   // the copy already contains the new line
+                }
+            }
+            try (FileOutputStream out = new FileOutputStream(m, true)) {
+                out.write(line.getBytes(StandardCharsets.US_ASCII));
+            }
+        } catch (IOException | RuntimeException e) {
+            Log.w(TAG, "history mirror failed: " + e.getMessage());
+        }
     }
 
     /** Readings since {@code sinceMs}, oldest first. */
@@ -117,6 +162,10 @@ final class History {
     static synchronized void clear(Context ctx) {
         //noinspection ResultOfMethodCallIgnored
         file(ctx).delete();
+        File m = mirrorFile(ctx);
+        if (m != null) //noinspection ResultOfMethodCallIgnored
+            m.delete();
+        mirrorChecked = false;
         loaded = false;
         lastT = 0;
         version++;

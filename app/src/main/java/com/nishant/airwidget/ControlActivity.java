@@ -85,6 +85,7 @@ public class ControlActivity extends Activity {
             Prefs p = new Prefs(this);
             boolean turbo = !SmartFan.rule(p).fast;
             SmartFan.setFast(p, turbo);
+            EventLog.event(this, "turbo " + (turbo ? "on" : "off") + " (tapped)");
             if (turbo && !SmartFan.enabled(p)) {          // Turbo also starts the Smart fan
                 if (Boolean.TRUE.equals(st.on)) SmartFan.setEnabled(this, true);
                 else Toast.makeText(this, "Turbo is set - turn the purifier on to start Smart fan", Toast.LENGTH_SHORT).show();
