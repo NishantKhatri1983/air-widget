@@ -84,12 +84,15 @@ public class ControlActivity extends Activity {
         smartTurbo = findViewById(R.id.smartTurbo);
         smartTurbo.setOnClickListener(v -> {
             Prefs p = new Prefs(this);
-            boolean turbo = !SmartFan.rule(p).fast;
+            boolean running = SmartFan.enabled(p);
+            // Turbo is "on" only while the Smart fan runs with Fast ramp-up. With the Smart fan off a tap always means
+            // "turn Turbo on", whatever the stored setting says.
+            boolean turbo = !running || !SmartFan.rule(p).fast;
             SmartFan.setFast(p, turbo);
             EventLog.event(this, "turbo " + (turbo ? "on" : "off") + " (tapped)");
-            if (turbo && !SmartFan.enabled(p)) {          // Turbo also starts the Smart fan
+            if (turbo && !running) {                      // Turbo also starts the Smart fan
                 if (Boolean.TRUE.equals(st.on)) SmartFan.setEnabled(this, true);
-                else Toast.makeText(this, "Turbo is set - turn the purifier on to start Smart fan", Toast.LENGTH_SHORT).show();
+                else Toast.makeText(this, "Turn the purifier on to start Turbo", Toast.LENGTH_SHORT).show();
             }
             renderSmart();
             AirWidget.render(this);
@@ -337,7 +340,7 @@ public class ControlActivity extends Activity {
         boolean on = SmartFan.enabled(p);
         if (smartSwitch.isChecked() != on) smartSwitch.setChecked(on);
         smartRule.setText(SmartFan.rule(p).describe());
-        boolean turbo = SmartFan.rule(p).fast;
+        boolean turbo = SmartFan.rule(p).fast && SmartFan.enabled(p);   // orange only while it is really running
         smartTurbo.setBackgroundResource(turbo ? R.drawable.bg_turbo_on : R.drawable.bg_turbo_off);
         smartTurbo.setTextColor(turbo ? 0xFFFFFFFF : 0xFF5B6676);
         String s = SmartFan.status(p);

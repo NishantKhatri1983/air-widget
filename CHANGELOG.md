@@ -3,6 +3,11 @@
 Every version is tagged (`vX.Y`). To go back to one: `git checkout vX.Y`. Prebuilt APKs: `apk/` and the GitHub releases
 (not every version has one; any version can be rebuilt from its tag). Newest first.
 
+## v1.9 (2026-11-27)
+- The Turbo button is orange only while the Smart fan is really running in Turbo; with Smart fan off it is grey.
+- Tapping Turbo with Smart fan off always switches Turbo on and starts Smart fan (if the purifier is on).
+- Turbo and Smart fan are remembered across purifier restarts and phone reboots.
+
 ## v1.8 (2026-11-27)
 - Power-cut fix: a purifier that reports "off" while its fan is spinning (rpm 100+) now counts as On in the widget, sheet, history and Smart fan.
 - The power button sends the last mode (or Auto) if `set_power on` is acknowledged but the purifier still reads off.
