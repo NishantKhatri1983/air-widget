@@ -54,7 +54,7 @@ Built and tested with a Mi Air Purifier 2 (`zhimi.airpurifier.m1`) on Android 17
 
 ## Download
 
-Latest prebuilt APK (debug-signed): [apk/air-widget-v1.6.apk](apk/air-widget-v1.6.apk), also attached to the [v1.6 release](https://github.com/NishantKhatri1983/air-widget/releases/tag/v1.6). Older: [v1.2](apk/air-widget-v1.2.apk), [v1.1](apk/air-widget-v1.1.apk), [v1.0](apk/air-widget-v1.0.apk). Don't install an older APK over a newer one.
+Latest prebuilt APK (debug-signed): [apk/air-widget-v1.7.apk](apk/air-widget-v1.7.apk), also attached to the [v1.7 release](https://github.com/NishantKhatri1983/air-widget/releases/tag/v1.7). Older: [v1.6](apk/air-widget-v1.6.apk), [v1.2](apk/air-widget-v1.2.apk), [v1.1](apk/air-widget-v1.1.apk), [v1.0](apk/air-widget-v1.0.apk). Every version is tagged and listed in [CHANGELOG.md](CHANGELOG.md). Don't install an older APK over a newer one.
 
 ## Build
 

@@ -78,6 +78,7 @@ public class ControlActivity extends Activity {
             }
             SmartFan.setEnabled(this, on);
             renderSmart();
+            AirWidget.render(this);
         });
         findViewById(R.id.smartEdit).setOnClickListener(v -> editSmartRule());
         smartTurbo = findViewById(R.id.smartTurbo);
@@ -91,6 +92,7 @@ public class ControlActivity extends Activity {
                 else Toast.makeText(this, "Turbo is set - turn the purifier on to start Smart fan", Toast.LENGTH_SHORT).show();
             }
             renderSmart();
+            AirWidget.render(this);
         });
         histSummary = findViewById(R.id.histSummary);
         int[] chipIds = {R.id.rng0, R.id.rng1, R.id.rng2, R.id.rng3};
@@ -374,6 +376,7 @@ public class ControlActivity extends Activity {
                     SmartFan.saveRule(p, Math.max(0, Math.min(500, a)), Math.max(1, Math.min(200, c)),
                             Math.max(0, Math.min(r.max, b)), Math.max(0, Math.min(r.max, l)),
                             Math.max(0, Math.min(600, num(hold, r.holdSec))), Math.max(0, Math.min(25, num(margin, r.margin))), fast.isChecked());
+                    AirWidget.render(this);
                     if (mute.isChecked() != (p.getInt("mute", 1) == 1)) PurifierControl.setMute(this, mute.isChecked());
                     renderSmart();
                 })

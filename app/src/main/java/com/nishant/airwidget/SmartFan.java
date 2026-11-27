@@ -107,6 +107,7 @@ final class SmartFan {
         p.put("smartStatus", "Off — you changed the fan");
         EventLog.event(ctx, "smart fan off: you changed the fan in the app");
         reset();
+        AirWidget.render(ctx);
     }
 
     private static void reset() {
@@ -242,6 +243,7 @@ final class SmartFan {
         reset();
         Log.i(TAG, "smart fan off: " + why);
         EventLog.event(ctx, "smart fan off: " + why);
+        AirWidget.render(ctx);
     }
 
     private static void sleep(long ms) {

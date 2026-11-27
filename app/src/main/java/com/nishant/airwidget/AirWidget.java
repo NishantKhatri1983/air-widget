@@ -121,7 +121,9 @@ public class AirWidget extends AppWidgetProvider {
         }
 
         String mode = p.get("lastMode");
-        String modeName = mode.equals("0") ? "Auto" : mode.equals("1") ? "Sleep" : mode.equals("2") ? "Favorite" : "";
+        // Labels: Turbo / Smart (the app is steering the fan), else Auto or Sleep. A manual Favorite shows plain "On".
+        String modeName = SmartFan.enabled(p) ? (SmartFan.rule(p).fast ? "Turbo" : "Smart")
+                : mode.equals("0") ? "Auto" : mode.equals("1") ? "Sleep" : "";
         v.setTextViewText(R.id.name, p.devName().isEmpty() ? "Air purifier" : p.devName());
         v.setTextViewText(R.id.state, !known ? "—" : on ? "On" + (modeName.isEmpty() ? "" : " · " + modeName) : "Off");
         v.setTextColor(R.id.dot, !known ? 0xFF9AA5B4 : on ? 0xFF2E9E4F : 0xFF9AA5B4);
