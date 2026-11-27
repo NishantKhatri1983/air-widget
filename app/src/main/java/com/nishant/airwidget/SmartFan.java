@@ -19,6 +19,7 @@ final class SmartFan {
     private static final String TAG = "AirWidget";
     private static final long MIN_GAP_MS = 45_000;
     private static final long GRACE_MS = 20_000;
+    private static final long CMD_RETRY_MS = 120_000;   // wait between attempts once commands keep failing
     private static final long FLIP_WINDOW_MS = 60_000;   // a mode change this soon after our command = the purifier's own doing
     private static final long FLIP_PERIOD_MS = 10 * 60_000;   // at most 2 restores per this period
     private static final long FAST_GAP_MS = 10_000;   // fast ramp-up: minimum time between two "raise" commands
@@ -87,7 +88,9 @@ final class SmartFan {
     private static boolean takeover;       // first reading after enabling: switch to Favorite and set the level
     private static volatile boolean hot;   // latest reading is at/above the start AQI or jumped up
     private static double prevAqi = Double.NaN;
-    private static long flipA, flipB;          // times of the two latest "purifier flipped to Auto" restores (kept across reset)
+    private static int cmdFails;              // commands that failed in a row
+    private static long cmdBlockedUntil;       // no command attempts before this time
+    private static long flipA, flipB;         // times of the two latest "purifier flipped to Auto" restores (kept across reset)
 
     static synchronized void setEnabled(Context ctx, boolean on) {
         Prefs p = new Prefs(ctx);
@@ -120,6 +123,8 @@ final class SmartFan {
         takeover = false;
         hot = false;
         prevAqi = Double.NaN;
+        cmdFails = 0;
+        cmdBlockedUntil = 0;
     }
 
     /** Feed every reading in; sends a command to the purifier when the level should change. */
@@ -202,6 +207,10 @@ final class SmartFan {
 
         long gap = rule.fast && cur >= 0 && want != null && want > cur ? FAST_GAP_MS : MIN_GAP_MS;
         if (want != null && !takeover && now - lastCmdAt < gap) want = null;   // too soon after the last change
+        if (want != null && now < cmdBlockedUntil) {          // the purifier isn't taking commands: don't hammer it
+            p.put("smartStatus", "Purifier not answering commands - retrying in " + Math.max(1, (cmdBlockedUntil - now) / 1000) + " s");
+            return;
+        }
 
         if (want != null && (takeover || !fav || want != cur)) {
             try {
@@ -216,8 +225,10 @@ final class SmartFan {
                 takeover = false;
                 upCount = 0; downSince = 0; mismatch = 0;
                 cur = want;
+                cmdFails = 0;
             } catch (IOException e) {
                 p.put("smartStatus", "Couldn't reach the purifier");
+                noteCommandFailure(ctx, now);
                 return;
             }
         }
@@ -230,6 +241,15 @@ final class SmartFan {
         }
         if (rule.fast) st += " · fast";
         p.put("smartStatus", st);
+    }
+
+    /** After 3 failed commands in a row, wait CMD_RETRY_MS before trying again (a power cut once caused 325 tries in an hour). */
+    private static void noteCommandFailure(Context ctx, long now) {
+        if (++cmdFails >= 3) {
+            cmdBlockedUntil = now + CMD_RETRY_MS;
+            cmdFails = 0;
+            EventLog.event(ctx, "smart fan: purifier not accepting commands, next try in " + CMD_RETRY_MS / 1000 + " s");
+        }
     }
 
     /** True while fewer than FLIP_MAX restores happened in the last FLIP_PERIOD_MS. */

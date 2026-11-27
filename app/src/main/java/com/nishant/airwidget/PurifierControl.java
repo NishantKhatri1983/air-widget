@@ -87,6 +87,7 @@ final class PurifierControl {
         s.hum = r.optDouble(4);
         s.temp = r.optDouble(5) / 10.0;
         if (r.length() >= 7 && !r.isNull(6) && r.optInt(6, -1) >= 0) s.rpm = r.optInt(6);
+        s.on = effectiveOn(s.on, s.rpm);
     }
 
     /** Legacy mode string -> 0/1/2, or null for anything else (e.g. what the device reports while off). */
@@ -128,6 +129,7 @@ final class PurifierControl {
             else if (is(p, "p", siid, piid)) s.pm25 = o.optDouble("value");
             else if (is(p, "r", siid, piid)) s.rpm = o.optInt("value");
         }
+        s.on = effectiveOn(s.on, s.rpm);
     }
 
     private static boolean is(Prefs p, String k, int siid, int piid) {
@@ -163,8 +165,41 @@ final class PurifierControl {
 
     // ------------------------------------------------------------------ write
 
+    private static volatile long lastOffCmdAt;
+
+    /**
+     * The purifier sometimes reports power=off while its fan is running (after a power cut it comes back like that) and
+     * then ignores set_power. A fan turning at real speed is "on", whatever the flag says - except for a few seconds after
+     * we told it to switch off, while the fan is still spinning down.
+     */
+    static Boolean effectiveOn(Boolean on, Integer rpm) {
+        if (on != null && !on && rpm != null && rpm >= 100
+                && System.currentTimeMillis() - lastOffCmdAt > 25_000) return Boolean.TRUE;
+        return on;
+    }
+
     static void setPower(Context ctx, boolean on) throws IOException {
+        if (!on) lastOffCmdAt = System.currentTimeMillis();
         write(ctx, "set_power", new JSONArray().put(on ? "on" : "off"), "o", on);
+        if (on) wakeIfStillOff(ctx);
+    }
+
+    /** set_power "on" is acknowledged but sometimes not obeyed; if the purifier still reads off, a mode command wakes it. */
+    private static void wakeIfStillOff(Context ctx) {
+        try {
+            Thread.sleep(800);
+            State s = read(ctx);
+            if (s.on != null && !s.on) {
+                Prefs p = new Prefs(ctx);
+                int mode = p.get("lastMode").matches("[012]") ? Integer.parseInt(p.get("lastMode")) : AUTO;
+                EventLog.event(ctx, "power on not taken (still reads off): sending mode " + LEGACY_MODE[mode] + " instead");
+                setMode(ctx, mode);
+            }
+        } catch (IOException | RuntimeException e) {
+            EventLog.event(ctx, "power on check failed: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     static void setMode(Context ctx, int mode) throws IOException {

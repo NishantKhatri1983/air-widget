@@ -135,6 +135,7 @@ final class Poller {
             else if (s == p.getInt("hS", -1) && pi == p.getInt("hP", -1)) r.hum = v;
             else if (s == p.getInt("pS", -1) && pi == p.getInt("pP", -1)) r.pm25 = v;
         }
+        r.on = PurifierControl.effectiveOn(r.on, r.rpm);
         return r;
     }
 
@@ -163,6 +164,7 @@ final class Poller {
             int rpm = res.optInt(6, -1);
             if (rpm >= 0) r.rpm = rpm;
         }
+        r.on = PurifierControl.effectiveOn(r.on, r.rpm);
         // While the purifier is off some sensors may report nothing; keep the power/mode state anyway.
         if (r.temp != null && r.temp.isNaN()) r.temp = null;
         if (r.hum != null && r.hum.isNaN()) r.hum = null;

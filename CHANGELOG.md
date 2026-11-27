@@ -3,6 +3,11 @@
 Every version is tagged (`vX.Y`). To go back to one: `git checkout vX.Y`. Prebuilt APKs: `apk/` and the GitHub releases
 (not every version has one; any version can be rebuilt from its tag). Newest first.
 
+## v1.8 (2026-11-27)
+- Power-cut fix: a purifier that reports "off" while its fan is spinning (rpm 100+) now counts as On in the widget, sheet, history and Smart fan.
+- The power button sends the last mode (or Auto) if `set_power on` is acknowledged but the purifier still reads off.
+- Smart fan stops after 3 failed commands in a row and retries every 2 minutes (a power cut had caused 325 failed attempts in an hour).
+
 ## v1.7 (2026-11-27)
 - The widget's state line now reads `On · Turbo`, `On · Smart`, `On · Auto`, `On · Sleep` or `Off`. A manual Favorite shows
   plain `On`.
